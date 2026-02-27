@@ -1,11 +1,45 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useStats } from '@/hooks/use-stats'; // Import the hook
+import { useStats } from '@/hooks/use-stats';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+const TOOLTIP_STEPS = [
+  {
+    title: 'Welcome to Reduxion!',
+    message: 'Your goal is to reach the Target number using math operations on the numbers shown.',
+  },
+  {
+    title: 'Select Numbers',
+    message: 'Tap one or two number tiles to select them. Selected tiles will be highlighted.',
+  },
+  {
+    title: 'Split',
+    message: 'Select one even number (greater than 2), then tap Split to divide it into two equal halves.',
+  },
+  {
+    title: 'Add, Subtract, Multiply',
+    message: 'Select two numbers, then tap an operation to combine them into a single new number.',
+  },
+  {
+    title: 'Undo & Reset',
+    message: 'Use the undo button (left arrow) to reverse your last move, or the reset button (circular arrow) to start over.',
+  },
+  {
+    title: 'Difficulty',
+    message: 'Tap the lightbulb icon to change difficulty. Harder levels use bigger numbers!',
+  },
+  {
+    title: 'Winning',
+    message: 'If any number on screen matches the Target, you win! Try to solve it in as few moves as possible.',
+  },
+];
+
+const TUTORIAL_KEY = 'reduxion_tutorial_shown_v1';
 
 export default function GameScreen() {
   const [currentNumbers, setCurrentNumbers] = useState<number[]>([]);
@@ -17,11 +51,24 @@ export default function GameScreen() {
   const [history, setHistory] = useState<number[][]>([]);
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
   const [menuVisible, setMenuVisible] = useState(false);
+  const [tooltipStep, setTooltipStep] = useState<number | null>(null);
 
   const primaryColor = useThemeColor({}, 'tint');
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
-  const { recordSolve } = useStats(); // Get the recordSolve method
+  const iconColor = useThemeColor({}, 'icon');
+  const operationButtonBg = useThemeColor({ light: '#0a7ea4', dark: '#555' }, 'tint');
+  const selectedNumberBg = operationButtonBg;
+  const { recordSolve } = useStats();
+
+  useEffect(() => {
+    AsyncStorage.getItem(TUTORIAL_KEY).then(value => {
+      if (!value) {
+        setTooltipStep(0);
+        AsyncStorage.setItem(TUTORIAL_KEY, 'true');
+      }
+    });
+  }, []);
 
   useEffect(() => {
     startNewGame();
@@ -32,7 +79,6 @@ export default function GameScreen() {
     checkWinCondition();
   }, [currentNumbers]);
 
-  // Handler to record the solve
   const handleWin = () => {
     if (!gameWon) {
       recordSolve(difficulty, moves);
@@ -40,7 +86,6 @@ export default function GameScreen() {
     }
   };
 
-  // Update checkWinCondition to use handleWin
   const checkWinCondition = () => {
     if (currentNumbers.some(num => num === targetNumber) && !gameWon) {
       handleWin();
@@ -51,23 +96,23 @@ export default function GameScreen() {
     let nums: number[] = [];
     let target: number;
     if (difficulty === 'easy') {
-      // One even and one odd 1-digit number (1-9)
-      let even = Math.ceil(Math.random() * 3) * 2 + 2; // 4,6,8
-      let odd = (Math.ceil(Math.random() * 3) + 2) * 2 - 1; // 5,7,9
-      nums = Math.random() < 0.5 ? [even, odd] : [odd, even];
-      target = Math.floor(Math.random() * 90) + 10; // 10-99
+      let even = Math.ceil(Math.random() * 3) * 2 + 2;
+      let odd = (Math.ceil(Math.random() * 3) + 2) * 2 - 1;
+      let third = Math.floor(Math.random() * 9) + 1;
+      nums = [even, odd, third];
+      target = Math.floor(Math.random() * 90) + 10;
     } else if (difficulty === 'medium') {
-      // One even and one odd 2-digit number (10-99)
-      let even = Math.floor(Math.random() * 45) * 2 + 10; // 10-98 even
-      let odd = Math.floor(Math.random() * 45) * 2 + 11;  // 11-99 odd
-      nums = Math.random() < 0.5 ? [even, odd] : [odd, even];
-      target = Math.floor(Math.random() * 900) + 100; // 100-999
+      let even = Math.floor(Math.random() * 49) * 2 + 2;
+      let odd = Math.floor(Math.random() * 49) * 2 + 3;
+      let third = Math.floor(Math.random() * 98) + 2;
+      nums = [even, odd, third];
+      target = Math.floor(Math.random() * 900) + 100;
     } else {
-      // hard: One even and one odd 3-digit number (100-999)
-      let even = Math.floor(Math.random() * 450) * 2 + 100; // 100-998 even
-      let odd = Math.floor(Math.random() * 450) * 2 + 101;  // 101-999 odd
-      nums = Math.random() < 0.5 ? [even, odd] : [odd, even];
-      target = Math.floor(Math.random() * 9000) + 1000; // 1000-9999
+      let even = Math.floor(Math.random() * 499) * 2 + 2;
+      let odd = Math.floor(Math.random() * 499) * 2 + 3;
+      let third = Math.floor(Math.random() * 998) + 2;
+      nums = [even, odd, third];
+      target = Math.floor(Math.random() * 9000) + 1000;
     }
     setInitialNumbers(nums);
     setCurrentNumbers(nums);
@@ -88,7 +133,6 @@ export default function GameScreen() {
 
   const undoMove = () => {
     if (history.length === 0) return;
-    
     const previousState = history[history.length - 1];
     setCurrentNumbers(previousState);
     setHistory(history.slice(0, -1));
@@ -108,9 +152,7 @@ export default function GameScreen() {
   const handleSplit = () => {
     if (selectedNumbers.length !== 1) return;
     const num = currentNumbers[selectedNumbers[0]];
-    // Only allow splitting even numbers >= 2
-    if (num < 2 || num % 2 !== 0) return;
-    // Check if split would exceed 4 numbers
+    if (num <= 2 || num % 2 !== 0) return;
     if (currentNumbers.length >= 4) return;
     const newNumbers = [...currentNumbers];
     newNumbers.splice(selectedNumbers[0], 1);
@@ -122,19 +164,14 @@ export default function GameScreen() {
     setMoves(moves + 1);
   };
 
-  // Square root operation removed
-
   const handleAdd = () => {
     if (selectedNumbers.length !== 2) return;
-    
     const [idx1, idx2] = selectedNumbers.sort((a, b) => b - a);
     const result = currentNumbers[idx1] + currentNumbers[idx2];
-    
     const newNumbers = [...currentNumbers];
     newNumbers.splice(idx1, 1);
     newNumbers.splice(idx2, 1);
     newNumbers.push(result);
-    
     setHistory([...history, currentNumbers]);
     setCurrentNumbers(newNumbers.filter(n => n !== 0));
     setSelectedNumbers([]);
@@ -143,16 +180,13 @@ export default function GameScreen() {
 
   const handleSubtract = () => {
     if (selectedNumbers.length !== 2) return;
-    
     const [idx1, idx2] = selectedNumbers;
     const result = Math.abs(currentNumbers[idx1] - currentNumbers[idx2]);
-    
     const sortedIndices = [idx1, idx2].sort((a, b) => b - a);
     const newNumbers = [...currentNumbers];
     newNumbers.splice(sortedIndices[0], 1);
     newNumbers.splice(sortedIndices[1], 1);
     newNumbers.push(result);
-    
     setHistory([...history, currentNumbers]);
     setCurrentNumbers(newNumbers.filter(n => n !== 0));
     setSelectedNumbers([]);
@@ -161,15 +195,12 @@ export default function GameScreen() {
 
   const handleMultiply = () => {
     if (selectedNumbers.length !== 2) return;
-    
     const [idx1, idx2] = selectedNumbers.sort((a, b) => b - a);
     const result = currentNumbers[idx1] * currentNumbers[idx2];
-    
     const newNumbers = [...currentNumbers];
     newNumbers.splice(idx1, 1);
     newNumbers.splice(idx2, 1);
     newNumbers.push(result);
-    
     setHistory([...history, currentNumbers]);
     setCurrentNumbers(newNumbers.filter(n => n !== 0));
     setSelectedNumbers([]);
@@ -179,7 +210,15 @@ export default function GameScreen() {
   const handleDifficultyChange = (newDifficulty: 'easy' | 'medium' | 'hard') => {
     setDifficulty(newDifficulty);
     setMenuVisible(false);
-  }
+  };
+
+  const advanceTooltip = () => {
+    if (tooltipStep !== null && tooltipStep < TOOLTIP_STEPS.length - 1) {
+      setTooltipStep(tooltipStep + 1);
+    } else {
+      setTooltipStep(null);
+    }
+  };
 
   const singleNumberSelected = selectedNumbers.length === 1;
   const twoNumbersSelected = selectedNumbers.length === 2;
@@ -213,13 +252,46 @@ export default function GameScreen() {
             }
         </TouchableOpacity>
       </ThemedView>
+
+      {/* Tooltip Overlay */}
+      <Modal
+        visible={tooltipStep !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTooltipStep(null)}>
+        <Pressable style={styles.tooltipOverlay} onPress={advanceTooltip}>
+          <View style={[styles.tooltipCard, { backgroundColor }]}>
+            <ThemedText type="subtitle" style={styles.tooltipTitle}>
+              {tooltipStep !== null ? TOOLTIP_STEPS[tooltipStep].title : ''}
+            </ThemedText>
+            <ThemedText style={styles.tooltipMessage}>
+              {tooltipStep !== null ? TOOLTIP_STEPS[tooltipStep].message : ''}
+            </ThemedText>
+            <ThemedView style={styles.tooltipFooter}>
+              <ThemedText style={styles.tooltipProgress}>
+                {tooltipStep !== null ? `${tooltipStep + 1} / ${TOOLTIP_STEPS.length}` : ''}
+              </ThemedText>
+              <Pressable onPress={advanceTooltip} style={[styles.tooltipButton, { backgroundColor: operationButtonBg }]}>
+                <Text style={styles.tooltipButtonText}>
+                  {tooltipStep !== null && tooltipStep < TOOLTIP_STEPS.length - 1 ? 'Next' : 'Got it!'}
+                </Text>
+              </Pressable>
+            </ThemedView>
+            <Pressable onPress={() => setTooltipStep(null)}>
+              <ThemedText style={styles.tooltipSkip}>Skip</ThemedText>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Menu Modal */}
       <Modal
         visible={menuVisible}
         transparent
         animationType="fade"
         onRequestClose={() => setMenuVisible(false)}>
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPressOut={() => setMenuVisible(false)}>
-          <View style={styles.menuDropdown}>
+          <View style={[styles.menuDropdown, { backgroundColor }]}>
             <TouchableOpacity onPress={() => { handleDifficultyChange('easy'); } } style={styles.menuItem}>
               <ThemedText style={difficulty === 'easy' ? styles.menuItemSelected : undefined}>Easy</ThemedText>
             </TouchableOpacity>
@@ -260,7 +332,7 @@ export default function GameScreen() {
                   style={[
                     styles.numberBox,
                     { borderColor: primaryColor },
-                    selectedNumbers.includes(index) && { backgroundColor: primaryColor }
+                    selectedNumbers.includes(index) && { backgroundColor: selectedNumberBg }
                   ]}
                   onPress={() => toggleNumberSelection(index)}>
                   <Text 
@@ -281,7 +353,7 @@ export default function GameScreen() {
           <ThemedView style={styles.operationsContainer}>
             <ThemedView style={styles.operationRowWithSides}>
               <Pressable
-                style={styles.sideButton}
+                style={[styles.sideButton, { backgroundColor, borderColor: iconColor }]}
                 onPress={resetGame}>
                 <IconSymbol name="restart.circle" size={28} color={primaryColor} />
               </Pressable>
@@ -290,49 +362,34 @@ export default function GameScreen() {
                   <Pressable
                     style={[
                       styles.operationButton,
-                      { backgroundColor: primaryColor },
-                      (!singleNumberSelected || selectedNum < 2 || currentNumbers.length >= 4) && styles.buttonDisabled
+                      { backgroundColor: operationButtonBg },
+                      (!singleNumberSelected || selectedNum <= 2 || selectedNum % 2 !== 0 || currentNumbers.length >= 4) && styles.buttonDisabled
                     ]}
                     onPress={handleSplit}
-                    disabled={!singleNumberSelected || selectedNum < 2 || currentNumbers.length >= 4}>
+                    disabled={!singleNumberSelected || selectedNum <= 2 || selectedNum % 2 !== 0 || currentNumbers.length >= 4}>
                     <IconSymbol name="rectangle.fill.on.rectangle.fill" size={32} color="#fff" />
                   </Pressable>
                   <Pressable
-                    style={[
-                      styles.operationButton,
-                      { backgroundColor: primaryColor },
-                      !twoNumbersSelected && styles.buttonDisabled
-                    ]}
-                    onPress={handleAdd}
-                    disabled={!twoNumbersSelected}>
+                    style={[styles.operationButton, { backgroundColor: operationButtonBg }, !twoNumbersSelected && styles.buttonDisabled]}
+                    onPress={handleAdd} disabled={!twoNumbersSelected}>
                     <ThemedText style={styles.buttonText}>+</ThemedText>
                   </Pressable>
                 </ThemedView>
                 <ThemedView style={styles.gridRow}>
                   <Pressable
-                    style={[
-                      styles.operationButton,
-                      { backgroundColor: primaryColor },
-                      !twoNumbersSelected && styles.buttonDisabled
-                    ]}
-                    onPress={handleSubtract}
-                    disabled={!twoNumbersSelected}>
+                    style={[styles.operationButton, { backgroundColor: operationButtonBg }, !twoNumbersSelected && styles.buttonDisabled]}
+                    onPress={handleSubtract} disabled={!twoNumbersSelected}>
                     <ThemedText style={styles.buttonText}>−</ThemedText>
                   </Pressable>
                   <Pressable
-                    style={[
-                      styles.operationButton,
-                      { backgroundColor: primaryColor },
-                      !twoNumbersSelected && styles.buttonDisabled
-                    ]}
-                    onPress={handleMultiply}
-                    disabled={!twoNumbersSelected}>
+                    style={[styles.operationButton, { backgroundColor: operationButtonBg }, !twoNumbersSelected && styles.buttonDisabled]}
+                    onPress={handleMultiply} disabled={!twoNumbersSelected}>
                     <ThemedText style={styles.buttonText}>×</ThemedText>
                   </Pressable>
                 </ThemedView>
               </ThemedView>
               <Pressable
-                style={[styles.sideButton, history.length === 0 && styles.disabledButton]}
+                style={[styles.sideButton, { backgroundColor, borderColor: iconColor }, history.length === 0 && styles.disabledButton]}
                 onPress={undoMove}
                 disabled={history.length === 0}>
                 <IconSymbol name="arrow.uturn.left.circle" size={28} color={primaryColor} />
@@ -347,225 +404,53 @@ export default function GameScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-  },
-  winContainerPadding: {
-    padding: 0,
-  },
-  centerContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 20,
-  },
-  title: {
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  instructions: {
-    textAlign: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  header: {
-    marginBottom: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 15,
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-  },
-  resetIconButton: {
-    padding: 8,
-  },
-  undoText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  disabledButton: {
-    opacity: 0.3,
-  },
-  disabledText: {
-    opacity: 0.3,
-  },
-  gameInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    gap: 10,
-  },
-  infoBox: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: 'rgba(128, 128, 128, 0.1)',
-  },
-  label: {
-    fontSize: 12,
-    opacity: 0.7,
-    marginBottom: 4,
-  },
-  infoNumber: {
-    fontSize: 20,
-  },
-  numbersContainer: {
-    marginBottom: 20,
-    minHeight: 240,
-    justifyContent: 'center',
-  },
-  numbersGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    maxWidth: 250,
-    alignSelf: 'center',
-  },
-  numberBox: {
-    borderWidth: 3,
-    borderRadius: 12,
-    padding: 15,
-    width: '45%',
-    minHeight: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  gridNumberBox: {
-    width: '47%',
-    minWidth: 0,
-  },
-  numberText: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    width: '100%',
-    textAlign: 'center',
-  },
-  selectedNumberText: {
-    color: '#fff',
-  },
-  operationsContainer: {
-    marginBottom: 20,
-  },
-  operationGrid: {
-    flexDirection: 'column',
-    gap: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  gridRow: {
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  operationButton: {
-    padding: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    minWidth: 80,
-    minHeight: 80,
-    justifyContent: 'center',
-  },
-  button: {
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    minWidth: 200,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: '600',
-  },
-  winButtonText: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  buttonSubtext: {
-    color: '#fff',
-    fontSize: 12,
-    marginTop: 4,
-    opacity: 0.9,
-  },
-  buttonDisabled: {
-    opacity: 0.3,
-  },
-  winContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 20,
-    flex: 1,
-  },
-  winText: {
-    fontSize: 48,
-    textAlign: 'center',
-    justifyContent: 'center',
-    maxWidth: '100%',
-    flex: 1,
-  },
-  winSubtext: {
-    fontSize: 18,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  operationRowWithSides: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 18,
-    marginBottom: 20,
-  },
-  sideButton: {
-    padding: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 999,
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#eee',
-    width: 48,
-    height: 48,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  menuButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-  },
-  menuDropdown: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginTop: 60,
-    marginRight: 16,
-    paddingVertical: 8,
-    minWidth: 120,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-  },
-  menuItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  menuItemSelected: {
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
+  container: { flex: 1, padding: 20 },
+  winContainerPadding: { padding: 0 },
+  centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 20 },
+  title: { textAlign: 'center', marginBottom: 10 },
+  instructions: { textAlign: 'center', paddingHorizontal: 20, marginBottom: 20, fontSize: 16, lineHeight: 24 },
+  header: { marginBottom: 20, flexDirection: 'row', alignItems: 'center', gap: 15, justifyContent: 'space-between', paddingHorizontal: 20 },
+  resetIconButton: { padding: 8 },
+  undoText: { fontSize: 24, fontWeight: 'bold' },
+  disabledButton: { opacity: 0.3 },
+  disabledText: { opacity: 0.3 },
+  gameInfo: { flex: 1, flexDirection: 'row', justifyContent: 'space-around', gap: 10 },
+  infoBox: { flex: 1, alignItems: 'center', padding: 12, borderRadius: 8, backgroundColor: 'rgba(128, 128, 128, 0.1)' },
+  label: { fontSize: 12, opacity: 0.7, marginBottom: 4 },
+  infoNumber: { fontSize: 20 },
+  numbersContainer: { marginBottom: 20, minHeight: 240, justifyContent: 'center' },
+  numbersGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', alignItems: 'center', maxWidth: 250, alignSelf: 'center' },
+  numberBox: { borderWidth: 3, borderRadius: 12, padding: 15, width: '45%', minHeight: 100, justifyContent: 'center', alignItems: 'center' },
+  gridNumberBox: { width: '47%', minWidth: 0 },
+  numberText: { fontSize: 40, fontWeight: 'bold', width: '100%', textAlign: 'center' },
+  selectedNumberText: { color: '#fff' },
+  operationsContainer: { marginBottom: 20 },
+  operationGrid: { flexDirection: 'column', gap: 12, justifyContent: 'center', alignItems: 'center' },
+  gridRow: { flexDirection: 'row', gap: 12, justifyContent: 'center', alignItems: 'center' },
+  operationButton: { padding: 20, borderRadius: 12, alignItems: 'center', minWidth: 80, minHeight: 80, justifyContent: 'center' },
+  button: { padding: 15, borderRadius: 8, alignItems: 'center', minWidth: 200 },
+  buttonText: { color: '#fff', fontSize: 32, fontWeight: '600' },
+  winButtonText: { color: '#fff', fontSize: 24, fontWeight: '600' },
+  buttonSubtext: { color: '#fff', fontSize: 12, marginTop: 4, opacity: 0.9 },
+  buttonDisabled: { opacity: 0.3 },
+  winContainer: { alignItems: 'center', justifyContent: 'center', gap: 20, flex: 1 },
+  winText: { fontSize: 48, textAlign: 'center', maxWidth: '100%' },
+  winSubtext: { fontSize: 18, textAlign: 'center', marginBottom: 20 },
+  operationRowWithSides: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 18, marginBottom: 20 },
+  sideButton: { padding: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 999, borderWidth: 2, width: 48, height: 48, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  menuButton: { padding: 8, marginLeft: 8 },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.2)', justifyContent: 'flex-start', alignItems: 'flex-end' },
+  menuDropdown: { borderRadius: 8, marginTop: 60, marginRight: 16, paddingVertical: 8, minWidth: 120, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
+  menuItem: { paddingVertical: 12, paddingHorizontal: 20 },
+  menuItemSelected: { fontWeight: 'bold', color: '#007AFF' },
+  // Tooltip styles
+  tooltipOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 30 },
+  tooltipCard: { borderRadius: 16, padding: 24, width: '100%', maxWidth: 340, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8, alignItems: 'center', gap: 12 },
+  tooltipTitle: { textAlign: 'center', marginBottom: 4 },
+  tooltipMessage: { textAlign: 'center', fontSize: 16, lineHeight: 24, opacity: 0.85 },
+  tooltipFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginTop: 8 },
+  tooltipProgress: { fontSize: 14, opacity: 0.5 },
+  tooltipButton: { paddingVertical: 10, paddingHorizontal: 24, borderRadius: 8 },
+  tooltipButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  tooltipSkip: { fontSize: 14, opacity: 0.5, marginTop: 4 },
 });
