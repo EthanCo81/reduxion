@@ -335,9 +335,9 @@ export default function GameScreen() {
             Completed in {moves} moves
           </ThemedText>
           <Pressable
-            style={[styles.button, { backgroundColor: primaryColor }]}
+            style={[styles.button, { backgroundColor: operationButtonBg }]}
             onPress={startNewGame}>
-            <ThemedText style={styles.winButtonText}>Play Again</ThemedText>
+            <Text style={styles.winButtonText}>Play Again</Text>
           </Pressable>
         </ThemedView>
       ) : (
