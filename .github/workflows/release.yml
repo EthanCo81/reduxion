@@ -1,0 +1,47 @@
+name: Build and Submit Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-submit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Extracted version: $VERSION"
+
+      - name: Update version in app.json
+        run: |
+          jq --arg v "${{ steps.version.outputs.version }}" '.expo.version = $v' app.json > app.tmp.json
+          mv app.tmp.json app.json
+          cat app.json | jq '.expo.version'
+
+      - name: Build and submit iOS
+        run: eas build --platform ios --profile production --auto-submit --non-interactive
+
+      - name: Build and submit Android
+        run: eas build --platform android --profile production --auto-submit --non-interactive
