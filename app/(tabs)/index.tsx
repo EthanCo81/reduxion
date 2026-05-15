@@ -244,15 +244,7 @@ export default function GameScreen() {
         <TouchableOpacity
           style={styles.menuButton}
           onPress={() => setMenuVisible(true)}>
-            {
-              difficulty === 'easy' ? (
-                <IconSymbol name="lightbulb" size={28} color={primaryColor} />
-              ) : difficulty === 'medium' ? (
-                <IconSymbol name="lightbulb.min" size={28} color={primaryColor} />
-              ) : (
-                <IconSymbol name="lightbulb.max" size={28} color={primaryColor} />
-              )
-            }
+            <IconSymbol name="lightbulb" size={28} color={primaryColor} />
         </TouchableOpacity>
         <ThemedView style={styles.gameInfo}>
           <ThemedView style={styles.infoBox}>
