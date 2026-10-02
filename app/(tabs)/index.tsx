@@ -1,11 +1,21 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useStats, type Difficulty } from '@/hooks/use-stats';
+import {
+  buildShareMessage,
+  buildShareUrl,
+  type Difficulty,
+  type SharedPuzzle,
+} from '@/constants/share';
+import {
+  consumePendingSharedPuzzle,
+  subscribeSharedPuzzle,
+} from '@/constants/shared-puzzle-store';
+import { useStats } from '@/hooks/use-stats';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useState } from 'react';
-import { Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Modal, Platform, Pressable, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 /** Pick a font size that keeps every digit on one line inside the tile. */
@@ -62,6 +72,7 @@ export default function GameScreen() {
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [menuVisible, setMenuVisible] = useState(false);
   const [tooltipStep, setTooltipStep] = useState<number | null>(null);
+  const skipDifficultyRegen = useRef(false);
 
   const primaryColor = useThemeColor({}, 'tint');
   const backgroundColor = useThemeColor({}, 'background');
@@ -81,7 +92,26 @@ export default function GameScreen() {
   }, []);
 
   useEffect(() => {
+    if (skipDifficultyRegen.current) {
+      skipDifficultyRegen.current = false;
+      return;
+    }
+
+    const pendingPuzzle = consumePendingSharedPuzzle();
+    if (pendingPuzzle) {
+      loadSharedPuzzle(pendingPuzzle);
+      return;
+    }
+
     startNewGame();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [difficulty]);
+
+  useEffect(() => {
+    return subscribeSharedPuzzle((puzzle) => {
+      consumePendingSharedPuzzle();
+      loadSharedPuzzle(puzzle);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [difficulty]);
 
@@ -100,6 +130,24 @@ export default function GameScreen() {
     if (currentNumbers.some(num => num === targetNumber) && !gameWon) {
       handleWin();
     }
+  };
+
+  const applyPuzzle = (nums: number[], target: number) => {
+    setInitialNumbers(nums);
+    setCurrentNumbers(nums);
+    setTargetNumber(target);
+    setSelectedNumbers([]);
+    setMoves(0);
+    setGameWon(false);
+    setHistory([]);
+  };
+
+  const loadSharedPuzzle = (puzzle: SharedPuzzle) => {
+    if (puzzle.difficulty !== difficulty) {
+      skipDifficultyRegen.current = true;
+      setDifficulty(puzzle.difficulty);
+    }
+    applyPuzzle(puzzle.numbers, puzzle.target);
   };
 
   const startNewGame = () => {
@@ -135,13 +183,23 @@ export default function GameScreen() {
       nums = [n1, n2, n3, n4, n5, n6, n7, n8, n9, n10];
       target = Math.floor(Math.random() * 9000) + 1000;
     }
-    setInitialNumbers(nums);
-    setCurrentNumbers(nums);
-    setTargetNumber(target);
-    setSelectedNumbers([]);
-    setMoves(0);
-    setGameWon(false);
-    setHistory([]);
+    applyPuzzle(nums, target);
+  };
+
+  const handleShare = async () => {
+    const puzzle: SharedPuzzle = {
+      numbers: initialNumbers,
+      target: targetNumber,
+      difficulty,
+    };
+    const shareUrl = buildShareUrl(puzzle);
+    try {
+      await Share.share({
+        message: buildShareMessage(targetNumber, moves, shareUrl),
+      });
+    } catch {
+      // User dismissed the share sheet or sharing is unavailable.
+    }
   };
 
   const resetGame = () => {
@@ -352,8 +410,13 @@ export default function GameScreen() {
           </ThemedText>
           <Pressable
             style={[styles.button, { backgroundColor: operationButtonBg }]}
+            onPress={handleShare}>
+            <Text style={styles.winButtonText}>Share</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.button, styles.secondaryButton, { borderColor: primaryColor }]}
             onPress={startNewGame}>
-            <Text style={styles.winButtonText}>Play Again</Text>
+            <Text style={[styles.winButtonText, { color: primaryColor }]}>Play Again</Text>
           </Pressable>
         </ThemedView>
       ) : (
@@ -500,6 +563,7 @@ const styles = StyleSheet.create({
   gridRow: { flexDirection: 'row', gap: 12, justifyContent: 'center', alignItems: 'center' },
   operationButton: { padding: 20, borderRadius: 12, alignItems: 'center', minWidth: 80, minHeight: 80, justifyContent: 'center' },
   button: { padding: 15, borderRadius: 8, alignItems: 'center', minWidth: 200 },
+  secondaryButton: { backgroundColor: 'transparent', borderWidth: 2 },
   buttonText: { color: '#fff', fontSize: 32, fontWeight: '600' },
   winButtonText: { color: '#fff', fontSize: 24, fontWeight: '600' },
   buttonSubtext: { color: '#fff', fontSize: 12, marginTop: 4, opacity: 0.9 },
