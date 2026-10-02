@@ -15,8 +15,18 @@ import { useStats } from '@/hooks/use-stats';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Platform, Pressable, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+/** Pick a font size that keeps every digit on one line inside the tile. */
+function getNumberFontSize(num: number, difficulty: Difficulty): number {
+  const digits = String(Math.abs(num)).length;
+  const base = difficulty === 'hard' ? 18 : difficulty === 'medium' ? 24 : 40;
+  if (digits <= 2) return base;
+  if (digits === 3) return Math.round(base * 0.72);
+  if (digits === 4) return Math.round(base * 0.55);
+  return Math.max(Math.round(base * 0.42), 10);
+}
 
 const TOOLTIP_STEPS = [
   {
@@ -307,11 +317,25 @@ export default function GameScreen() {
         <ThemedView style={styles.gameInfo}>
           <ThemedView style={styles.infoBox}>
             <ThemedText style={styles.label}>Target:</ThemedText>
-            <ThemedText type="defaultSemiBold" style={styles.infoNumber}>{targetNumber}</ThemedText>
+            <ThemedText
+              type="defaultSemiBold"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.5}
+              style={styles.infoNumber}>
+              {targetNumber}
+            </ThemedText>
           </ThemedView>
           <ThemedView style={styles.infoBox}>
             <ThemedText style={styles.label}>Moves:</ThemedText>
-            <ThemedText type="defaultSemiBold" style={styles.infoNumber}>{moves}</ThemedText>
+            <ThemedText
+              type="defaultSemiBold"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.5}
+              style={styles.infoNumber}>
+              {moves}
+            </ThemedText>
           </ThemedView>
         </ThemedView>
         <TouchableOpacity
@@ -414,15 +438,14 @@ export default function GameScreen() {
                     selectedNumbers.includes(index) && { backgroundColor: selectedNumberBg }
                   ]}
                   onPress={() => toggleNumberSelection(index)}>
-                  <Text 
+                  <Text
                     adjustsFontSizeToFit
+                    minimumFontScale={0.35}
                     numberOfLines={1}
                     style={[
                       styles.numberText,
-                      difficulty === 'medium' && styles.numberText3x3,
-                      difficulty === 'hard' && styles.numberText4x4,
-                      { color: textColor },
-                      selectedNumbers.includes(index) && styles.selectedNumberText
+                      { color: textColor, fontSize: getNumberFontSize(num, difficulty) },
+                      selectedNumbers.includes(index) && styles.selectedNumberText,
                     ]}>
                     {num}
                   </Text>
@@ -496,19 +519,44 @@ const styles = StyleSheet.create({
   disabledButton: { opacity: 0.3 },
   disabledText: { opacity: 0.3 },
   gameInfo: { flex: 1, flexDirection: 'row', justifyContent: 'space-around', gap: 10 },
-  infoBox: { flex: 1, alignItems: 'center', padding: 12, borderRadius: 8, backgroundColor: 'rgba(128, 128, 128, 0.1)' },
+  infoBox: { flex: 1, alignItems: 'center', padding: 12, borderRadius: 8, backgroundColor: 'rgba(128, 128, 128, 0.1)', overflow: 'hidden' },
   label: { fontSize: 12, opacity: 0.7, marginBottom: 4 },
-  infoNumber: { fontSize: 20 },
+  infoNumber: {
+    fontSize: 20,
+    width: '100%',
+    textAlign: 'center',
+    ...Platform.select({
+      web: { whiteSpace: 'nowrap' as const },
+      default: {},
+    }),
+  },
   numbersContainer: { marginBottom: 20, minHeight: 240, justifyContent: 'center' },
   numbersGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', alignItems: 'center', maxWidth: 250, alignSelf: 'center' },
   numbersGrid3x3: { maxWidth: 320, gap: 6 },
   numbersGrid4x4: { maxWidth: 340, gap: 4 },
-  numberBox: { borderWidth: 3, borderRadius: 12, padding: 15, width: '45%', minHeight: 100, justifyContent: 'center', alignItems: 'center' },
-  numberBox3x3: { width: '30%', minHeight: 70, padding: 8, borderWidth: 2, borderRadius: 10 },
-  numberBox4x4: { width: '22%', minHeight: 55, padding: 4, borderWidth: 2, borderRadius: 8 },
-  numberText: { fontSize: 40, fontWeight: 'bold', width: '100%', textAlign: 'center' },
-  numberText3x3: { fontSize: 24 },
-  numberText4x4: { fontSize: 18 },
+  numberBox: {
+    borderWidth: 3,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 15,
+    width: '45%',
+    minHeight: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  numberBox3x3: { width: '30%', minHeight: 70, paddingHorizontal: 4, paddingVertical: 8, borderWidth: 2, borderRadius: 10 },
+  numberBox4x4: { width: '22%', minHeight: 55, paddingHorizontal: 2, paddingVertical: 4, borderWidth: 2, borderRadius: 8 },
+  numberText: {
+    fontWeight: 'bold',
+    width: '100%',
+    textAlign: 'center',
+    // Keep digits on a single line on every platform/screen size.
+    ...Platform.select({
+      web: { whiteSpace: 'nowrap' as const },
+      default: {},
+    }),
+  },
   selectedNumberText: { color: '#fff' },
   operationsContainer: { marginBottom: 20 },
   operationGrid: { flexDirection: 'column', gap: 12, justifyContent: 'center', alignItems: 'center' },
